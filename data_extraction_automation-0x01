@@ -1,13 +1,98 @@
 #!/bin/bash
 
-# File containing Pokémon data from Task 0
-DATA_FILE="data.json"
+#############################################
+# Data Extraction Automation - Task 1
+# Purpose: Extract and format Pokémon data using jq, awk, sed
+# Author: ALXprodev-Devops
+# Date: 2024
+#############################################
 
-# Extract Pokémon name, height, weight, and type using jq
-NAME=$(jq -r '.name' "$DATA_FILE" | sed 's/.*/\u&/')          # Capitalize first letter
-HEIGHT=$(jq -r '.height' "$DATA_FILE" | awk '{printf "%.1f", $1/10}')  # Convert decimeters to meters
-WEIGHT=$(jq -r '.weight' "$DATA_FILE" | awk '{printf "%.0f", $1/10}')  # Convert hectograms to kg
-TYPE=$(jq -r '.types[0].type.name' "$DATA_FILE" | sed 's/.*/\u&/')      # Capitalize first letter
+# Configuration
+INPUT_FILE="data.json"
 
-# Print formatted output
-echo "$NAME is of type $TYPE, weighs ${WEIGHT}kg, and is ${HEIGHT}m tall."
+# Function to check if file exists
+check_file() {
+    if [ ! -f "$INPUT_FILE" ]; then
+        echo "Error: $INPUT_FILE not found!" >&2
+        echo "Please run the API automation script first (Task 0)." >&2
+        exit 1
+    fi
+}
+
+# Function to validate JSON file
+validate_json() {
+    if ! jq empty "$INPUT_FILE" 2>/dev/null; then
+        echo "Error: $INPUT_FILE is not a valid JSON file!" >&2
+        exit 1
+    fi
+}
+
+# Function to extract Pokémon name
+extract_name() {
+    jq -r '.name' "$INPUT_FILE" | \
+    awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}'
+}
+
+# Function to extract height (convert from decimeters to meters)
+extract_height() {
+    jq -r '.height' "$INPUT_FILE" | \
+    awk '{printf "%.1f", $1 / 10}'
+}
+
+# Function to extract weight (convert from hectograms to kilograms)
+extract_weight() {
+    jq -r '.weight' "$INPUT_FILE" | \
+    awk '{printf "%.0f", $1 / 10}'
+}
+
+# Function to extract type(s)
+extract_types() {
+    # Extract all types and join them with " and "
+    jq -r '.types[].type.name' "$INPUT_FILE" | \
+    awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}' | \
+    awk 'NR==1{printf "%s",$0; next}{printf " and %s",$0}END{print ""}'
+}
+
+# Function to format output
+format_output() {
+    local name="$1"
+    local types="$2"
+    local weight="$3"
+    local height="$4"
+    
+    # Build the output string
+    echo "$name is of type $types, weighs ${weight}kg, and is ${height}m tall."
+}
+
+# Main execution
+main() {
+    # Check prerequisites
+    check_file
+    validate_json
+    
+    # Check if required commands are available
+    for cmd in jq awk sed; do
+        if ! command -v "$cmd" &> /dev/null; then
+            echo "Error: $cmd is not installed!" >&2
+            exit 1
+        fi
+    done
+    
+    # Extract data
+    local name=$(extract_name)
+    local height=$(extract_height)
+    local weight=$(extract_weight)
+    local types=$(extract_types)
+    
+    # Validate extracted data
+    if [ -z "$name" ] || [ -z "$height" ] || [ -z "$weight" ] || [ -z "$types" ]; then
+        echo "Error: Failed to extract complete Pokémon data!" >&2
+        exit 1
+    fi
+    
+    # Format and display output
+    format_output "$name" "$types" "$weight" "$height"
+}
+
+# Run main function
+main
