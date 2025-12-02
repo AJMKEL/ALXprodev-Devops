@@ -1,0 +1,134 @@
+#!/bin/bash
+
+#############################################
+# API Request Automation - Task 0
+# Purpose: Fetch Pokémon data from API and save to file
+# Author: ALXprodev-Devops
+# Date: 2024
+#############################################
+
+# Configuration
+POKEMON_NAME="pikachu"
+API_BASE_URL="https://pokeapi.co/api/v2/pokemon"
+OUTPUT_FILE="data.json"
+ERROR_FILE="errors.txt"
+HTTP_TIMEOUT=10
+
+# Function to log errors
+log_error() {
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] ERROR: $1" >> "$ERROR_FILE"
+}
+
+# Function to make API request
+fetch_pokemon_data() {
+    local pokemon="$1"
+    local url="${API_BASE_URL}/${pokemon}"
+    
+    echo "Fetching data for Pokémon: $pokemon..."
+    
+    # Make the API request with proper error handling
+    # -s: silent mode (no progress bar)
+    # -S: show errors even in silent mode
+    # -f: fail silently on HTTP errors (returns non-zero exit code)
+    # -w: write out HTTP status code
+    # --connect-timeout: connection timeout
+    # --max-time: maximum time allowed for transfer
+    
+    local http_code
+    local response
+    
+    # Capture both response and HTTP status code
+    response=$(curl -s -S -f \
+        --connect-timeout "$HTTP_TIMEOUT" \
+        --max-time "$HTTP_TIMEOUT" \
+        -w "\n%{http_code}" \
+        "$url" 2>&1)
+    
+    local curl_exit_code=$?
+    
+    # Extract HTTP status code (last line)
+    http_code=$(echo "$response" | tail -n 1)
+    
+    # Remove HTTP status code from response
+    response=$(echo "$response" | sed '$d')
+    
+    # Check if curl command was successful
+    if [ $curl_exit_code -ne 0 ]; then
+        log_error "Failed to fetch data for '$pokemon'. Curl exit code: $curl_exit_code"
+        log_error "Curl error details: $response"
+        return 1
+    fi
+    
+    # Validate HTTP status code
+    if [ "$http_code" -ne 200 ]; then
+        log_error "HTTP request failed with status code: $http_code"
+        log_error "URL: $url"
+        return 1
+    fi
+    
+    # Validate JSON response
+    if ! echo "$response" | jq empty 2>/dev/null; then
+        log_error "Invalid JSON response received from API"
+        log_error "Response preview: ${response:0:200}..."
+        return 1
+    fi
+    
+    # Save the response to file
+    echo "$response" > "$OUTPUT_FILE"
+    
+    if [ $? -eq 0 ]; then
+        echo "✓ Successfully saved data to $OUTPUT_FILE"
+        echo "✓ Pokémon: $(echo "$response" | jq -r '.name')"
+        echo "✓ Base Experience: $(echo "$response" | jq -r '.base_experience')"
+        echo "✓ Height: $(echo "$response" | jq -r '.height')"
+        echo "✓ Weight: $(echo "$response" | jq -r '.weight')"
+        return 0
+    else
+        log_error "Failed to write data to $OUTPUT_FILE"
+        return 1
+    fi
+}
+
+# Main execution
+main() {
+    echo "=========================================="
+    echo "Pokémon API Request Automation"
+    echo "=========================================="
+    echo ""
+    
+    # Check if jq is installed
+    if ! command -v jq &> /dev/null; then
+        echo "ERROR: jq is not installed. Please install it first."
+        log_error "jq is not installed on the system"
+        exit 1
+    fi
+    
+    # Check if curl is installed
+    if ! command -v curl &> /dev/null; then
+        echo "ERROR: curl is not installed. Please install it first."
+        log_error "curl is not installed on the system"
+        exit 1
+    fi
+    
+    # Create or clear error file
+    > "$ERROR_FILE"
+    
+    # Fetch the Pokémon data
+    if fetch_pokemon_data "$POKEMON_NAME"; then
+        echo ""
+        echo "=========================================="
+        echo "Operation completed successfully!"
+        echo "=========================================="
+        exit 0
+    else
+        echo ""
+        echo "=========================================="
+        echo "Operation failed. Check $ERROR_FILE for details."
+        echo "=========================================="
+        exit 1
+    fi
+}
+
+# Run main function
+main
