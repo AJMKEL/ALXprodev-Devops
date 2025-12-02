@@ -11,9 +11,6 @@ mkdir -p "$OUTPUT_DIR"
 # List of Pokémon to fetch
 POKEMONS=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
-# Array to hold background process PIDs
-PIDS=()
-
 # Function to fetch a single Pokémon with retry logic
 fetch_pokemon() {
     local pokemon=$1
@@ -43,15 +40,18 @@ fetch_pokemon() {
     fi
 }
 
-# Loop through each Pokémon and start fetching in the background
+# Start fetching Pokémon in parallel
 for pokemon in "${POKEMONS[@]}"; do
     fetch_pokemon "$pokemon" &
-    PIDS+=($!)  # Store PID of background process
 done
 
-# Wait for all background processes to complete
-for pid in "${PIDS[@]}"; do
-    wait $pid || echo "Process $pid failed or was killed."
-done
+# Show background jobs
+jobs
+
+# Wait for all background jobs to finish
+wait
+
+# Show jobs after completion
+jobs
 
 echo "All Pokémon data fetching completed."
