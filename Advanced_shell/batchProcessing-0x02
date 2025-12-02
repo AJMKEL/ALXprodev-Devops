@@ -2,6 +2,8 @@
 
 # Directory to store Pokémon data
 OUTPUT_DIR="pokemon_data"
+# Error log file
+ERROR_FILE="errors.txt"
 
 # Create directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -13,18 +15,31 @@ POKEMONS=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 for pokemon in "${POKEMONS[@]}"; do
     echo "Fetching data for $pokemon..."
     
-    # Fetch data from Pokémon API
-    RESPONSE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/$pokemon.json" "https://pokeapi.co/api/v2/pokemon/$pokemon")
-    
-    # Extract HTTP status code
-    STATUS=${RESPONSE: -3}
-    
-    if [ "$STATUS" -eq 200 ]; then
-        echo "Saved data to $OUTPUT_DIR/$pokemon.json ✅"
-    else
-        echo "Failed to fetch data for $pokemon. Status code: $STATUS ❌"
+    retries=0
+    success=0
+
+    # Retry mechanism: try up to 3 times
+    while [ $retries -lt 3 ]; do
+        RESPONSE=$(curl -s -w "%{http_code}" -o "$OUTPUT_DIR/$pokemon.json" "https://pokeapi.co/api/v2/pokemon/$pokemon")
+        STATUS=${RESPONSE: -3}
+
+        if [ "$STATUS" -eq 200 ]; then
+            echo "Saved data to $OUTPUT_DIR/$pokemon.json ✅"
+            success=1
+            break
+        else
+            retries=$((retries + 1))
+            echo "Attempt $retries failed for $pokemon (status: $STATUS). Retrying..."
+            sleep 1
+        fi
+    done
+
+    # Log error if all retries fail
+    if [ $success -eq 0 ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Failed to fetch $pokemon after 3 attempts (status: $STATUS)" >> "$ERROR_FILE"
+        echo "Failed to fetch $pokemon ❌. Logged to $ERROR_FILE"
     fi
-    
-    # Delay to avoid rate limiting
+
+    # Delay to avoid API rate-limiting
     sleep 1
 done
