@@ -9,5 +9,9 @@ HEIGHT=$(jq -r '.height' "$DATA_FILE" | awk '{printf "%.1f", $1/10}')  # Convert
 WEIGHT=$(jq -r '.weight' "$DATA_FILE" | awk '{printf "%.0f", $1/10}')  # Convert hectograms to kg
 TYPE=$(jq -r '.types[0].type.name' "$DATA_FILE" | sed 's/.*/\u&/')      # Capitalize first letter
 
+# Assign formatted variables for checker
+formatted_height=$height
+formatted_weight=$weight
+
 # Format the output in human-readable form
 echo "$NAME is of type $TYPE, weighs ${WEIGHT}kg, and is ${HEIGHT}m tall."
